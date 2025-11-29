@@ -461,11 +461,12 @@ const App: React.FC = () => {
             {viewMode === 'storyboards' && (
               <h2 className="text-lg font-bold text-white">스토리보드 갤러리</h2>
             )}
-            {/* Portal target for CueSheet header actions */}
-            <div id="header-actions" className="flex items-center gap-2"></div>
+            {/* Right Side Actions */}
+            <div className="flex items-center gap-2 ml-auto">
+              {/* Portal target for CueSheet header actions */}
+              <div id="header-actions" className="flex items-center gap-2"></div>
 
-            {/* Global Backup Upload Button */}
-            <div className="flex items-center gap-2">
+              {/* Global Backup Upload Button */}
               <input
                 ref={backupFileInputRef}
                 type="file"
@@ -483,6 +484,7 @@ const App: React.FC = () => {
                 </svg>
                 복원
               </button>
+              <div className="h-4 w-px bg-slate-700"></div>
               <div className="text-xs text-slate-500">
                 {user?.email}
               </div>
