@@ -25,7 +25,7 @@ const App: React.FC = () => {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState<AppStep>(AppStep.SETUP_STORY);
-  const [viewMode, setViewMode] = useState<ViewMode>('wizard');
+  const [viewMode, setViewMode] = useState<ViewMode>('projects');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
   // Global State
