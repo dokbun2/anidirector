@@ -213,7 +213,7 @@ const App: React.FC = () => {
     }, 100);
   };
 
-  const handleReset = () => {
+  const handleReset = (goToProjects: boolean = false) => {
     setCurrentStep(AppStep.SETUP_STORY);
     setStoryboardData(null);
     setStoryConfig({
@@ -232,7 +232,7 @@ const App: React.FC = () => {
       aspectRatio: '16:9'
     });
     setCurrentProjectId(null);
-    setViewMode('wizard');
+    setViewMode(goToProjects ? 'projects' : 'wizard');
   };
 
   const startNewProject = () => {
@@ -489,7 +489,7 @@ const App: React.FC = () => {
 
               {/* Reset Button */}
               <button
-                onClick={() => { handleReset(); setViewMode('projects'); }}
+                onClick={() => handleReset(true)}
                 className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded-md border border-slate-700 transition-colors"
                 title="초기화"
               >
