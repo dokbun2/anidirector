@@ -487,14 +487,11 @@ const App: React.FC = () => {
               {/* Portal target for CueSheet header actions */}
               <div id="header-actions" className="flex items-center gap-2"></div>
 
-              {/* Reset Button */}
+              {/* Refresh/Reload Button */}
               <button
-                onClick={() => {
-                  console.log('Reset button clicked');
-                  handleReset(true);
-                }}
+                onClick={() => window.location.reload()}
                 className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded-md border border-slate-700 transition-colors cursor-pointer"
-                title="초기화"
+                title="새로고침"
                 type="button"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 pointer-events-none">
