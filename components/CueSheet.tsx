@@ -310,181 +310,229 @@ const CueSheet: React.FC<Props> = ({ data, characters, songConfig, onReset, onSa
     setIsDownloadingPdf(true);
 
     try {
-        // Create hidden container for PDF content
-        const container = document.createElement('div');
-        container.id = 'pdf-export-container';
-        container.style.cssText = `
-          position: fixed;
-          left: -9999px;
-          top: 0;
-          width: 800px;
-          background: #0f172a;
-          font-family: 'Noto Sans KR', sans-serif;
-          color: #e2e8f0;
-          padding: 40px;
-        `;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 10;
 
-        // ========== COVER PAGE ==========
-        const coverPage = `
-          <div style="min-height: 1000px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
-            <h1 style="font-size: 48px; font-weight: bold; color: white; margin-bottom: 20px;">${songConfig.title || '제목 없음'}</h1>
-            <p style="font-size: 20px; color: #94a3b8; margin-bottom: 40px;">3D Animation Storyboard</p>
-            <div style="color: #64748b;">
-              <p>총 ${scenes.length}개 씬</p>
+        // Helper: Create temp container and capture as image
+        const captureSection = async (html: string, width: number = 760): Promise<string> => {
+            const container = document.createElement('div');
+            container.style.cssText = `
+              position: fixed;
+              left: -9999px;
+              top: 0;
+              width: ${width}px;
+              background: #0f172a;
+              font-family: 'Noto Sans KR', sans-serif;
+              color: #e2e8f0;
+              padding: 30px;
+            `;
+            container.innerHTML = html;
+            document.body.appendChild(container);
+
+            // Wait for images
+            const images = container.querySelectorAll('img');
+            await Promise.all(Array.from(images).map(img => {
+              if (img.complete) return Promise.resolve();
+              return new Promise((resolve) => {
+                img.onload = resolve;
+                img.onerror = resolve;
+              });
+            }));
+
+            const canvas = await html2canvas(container, {
+              scale: 2,
+              backgroundColor: '#0f172a',
+              useCORS: true,
+              logging: false,
+              windowWidth: width
+            });
+
+            document.body.removeChild(container);
+            return canvas.toDataURL('image/png');
+        };
+
+        // Helper: Add image to PDF with page management
+        const addImageToPdf = async (imgData: string, isFirstPage: boolean = false) => {
+            if (!isFirstPage) pdf.addPage();
+
+            const img = new Image();
+            img.src = imgData;
+            await new Promise(resolve => { img.onload = resolve; });
+
+            const imgWidth = pageWidth - (margin * 2);
+            const imgHeight = (img.height * imgWidth) / img.width;
+
+            // If image fits on one page
+            if (imgHeight <= pageHeight - (margin * 2)) {
+                pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, imgHeight);
+            } else {
+                // Split across multiple pages
+                let remainingHeight = imgHeight;
+                let sourceY = 0;
+                let isFirst = true;
+
+                while (remainingHeight > 0) {
+                    if (!isFirst) pdf.addPage();
+
+                    const availableHeight = pageHeight - (margin * 2);
+                    const sliceHeight = Math.min(remainingHeight, availableHeight);
+                    const sourceHeight = (sliceHeight / imgHeight) * img.height;
+
+                    // Create canvas for this slice
+                    const sliceCanvas = document.createElement('canvas');
+                    sliceCanvas.width = img.width;
+                    sliceCanvas.height = sourceHeight;
+                    const ctx = sliceCanvas.getContext('2d')!;
+                    ctx.drawImage(img, 0, sourceY, img.width, sourceHeight, 0, 0, img.width, sourceHeight);
+
+                    pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', margin, margin, imgWidth, sliceHeight);
+
+                    sourceY += sourceHeight;
+                    remainingHeight -= sliceHeight;
+                    isFirst = false;
+                }
+            }
+        };
+
+        // ========== 1. COVER PAGE ==========
+        const coverHtml = `
+          <div style="height: 800px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+            <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #ec4899, #8b5cf6); border-radius: 20px; margin-bottom: 30px; display: flex; align-items: center; justify-content: center;">
+              <span style="font-size: 32px; font-weight: bold; color: white;">3D</span>
+            </div>
+            <h1 style="font-size: 42px; font-weight: bold; color: white; margin-bottom: 16px;">${songConfig.title || '제목 없음'}</h1>
+            <p style="font-size: 18px; color: #94a3b8; margin-bottom: 40px;">3D Animation Storyboard</p>
+            <div style="color: #64748b; font-size: 14px;">
+              <p style="margin-bottom: 8px;">총 ${scenes.length}개 씬 | ${characters.length}명의 캐릭터</p>
               <p>생성일: ${new Date().toLocaleDateString('ko-KR')}</p>
             </div>
           </div>
         `;
+        const coverImg = await captureSection(coverHtml);
+        await addImageToPdf(coverImg, true);
 
-        // ========== STORY SETUP PAGE ==========
-        const storyPage = `
-          <div style="min-height: 1000px; padding: 40px 0; page-break-before: always;">
-            <div style="display: flex; align-items: center; margin-bottom: 30px;">
-              <div style="width: 6px; height: 40px; background: #ec4899; border-radius: 3px; margin-right: 15px;"></div>
-              <h2 style="font-size: 32px; font-weight: bold; color: white;">스토리 설정</h2>
+        // ========== 2. STORY SETUP PAGE ==========
+        const storyHtml = `
+          <div style="padding: 20px 0;">
+            <div style="display: flex; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #ec4899;">
+              <div style="width: 6px; height: 32px; background: #ec4899; border-radius: 3px; margin-right: 12px;"></div>
+              <h2 style="font-size: 28px; font-weight: bold; color: white;">스토리 설정</h2>
             </div>
 
-            <div style="background: #1e293b; border-radius: 12px; padding: 24px; margin-bottom: 20px;">
-              <div style="margin-bottom: 16px;">
-                <span style="color: #06b6d4; font-weight: 600;">주인공:</span>
-                <span style="margin-left: 10px;">${songConfig.mainCharacterName} - ${songConfig.mainCharacterDescription}</span>
-              </div>
-              <div style="margin-bottom: 16px;">
-                <span style="color: #06b6d4; font-weight: 600;">구해야 할 대상:</span>
-                <span style="margin-left: 10px;">${songConfig.targetToSave} - ${songConfig.targetToSaveDescription || ''}</span>
-              </div>
-              <div style="margin-bottom: 16px;">
-                <span style="color: #06b6d4; font-weight: 600;">위험 요소 (위협):</span>
-                <span style="margin-left: 10px;">${songConfig.dangerThreat}</span>
-              </div>
-              <div style="margin-bottom: 16px;">
-                <span style="color: #06b6d4; font-weight: 600;">위험 요소 (도구):</span>
-                <span style="margin-left: 10px;">${songConfig.dangerTool}</span>
-              </div>
-              <div style="margin-bottom: 16px;">
-                <span style="color: #06b6d4; font-weight: 600;">위험 장소:</span>
-                <span style="margin-left: 10px;">${songConfig.dangerLocation}</span>
-              </div>
-              <div style="margin-bottom: 16px;">
-                <span style="color: #06b6d4; font-weight: 600;">배경 설정:</span>
-                <span style="margin-left: 10px;">${songConfig.backgroundSetting}</span>
-              </div>
-              <div>
-                <span style="color: #06b6d4; font-weight: 600;">화면 비율:</span>
-                <span style="margin-left: 10px;">${songConfig.aspectRatio}</span>
-              </div>
+            <div style="background: #1e293b; border-radius: 12px; padding: 24px; margin-bottom: 16px;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr style="border-bottom: 1px solid #334155;">
+                  <td style="padding: 12px 0; color: #06b6d4; font-weight: 600; width: 140px; vertical-align: top;">주인공</td>
+                  <td style="padding: 12px 0; color: #e2e8f0;">${songConfig.mainCharacterName} - ${songConfig.mainCharacterDescription}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                  <td style="padding: 12px 0; color: #06b6d4; font-weight: 600; vertical-align: top;">구해야 할 대상</td>
+                  <td style="padding: 12px 0; color: #e2e8f0;">${songConfig.targetToSave} - ${songConfig.targetToSaveDescription || ''}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                  <td style="padding: 12px 0; color: #06b6d4; font-weight: 600;">위험 요소 (위협)</td>
+                  <td style="padding: 12px 0; color: #e2e8f0;">${songConfig.dangerThreat}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                  <td style="padding: 12px 0; color: #06b6d4; font-weight: 600;">위험 요소 (도구)</td>
+                  <td style="padding: 12px 0; color: #e2e8f0;">${songConfig.dangerTool}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                  <td style="padding: 12px 0; color: #06b6d4; font-weight: 600;">위험 장소</td>
+                  <td style="padding: 12px 0; color: #e2e8f0;">${songConfig.dangerLocation}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #334155;">
+                  <td style="padding: 12px 0; color: #06b6d4; font-weight: 600;">배경 설정</td>
+                  <td style="padding: 12px 0; color: #e2e8f0;">${songConfig.backgroundSetting}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; color: #06b6d4; font-weight: 600;">화면 비율</td>
+                  <td style="padding: 12px 0; color: #e2e8f0;">${songConfig.aspectRatio}</td>
+                </tr>
+              </table>
             </div>
 
             ${songConfig.additionalCharacters && songConfig.additionalCharacters.length > 0 ? `
               <div style="background: #1e293b; border-radius: 12px; padding: 24px;">
-                <h3 style="color: #06b6d4; font-weight: 600; margin-bottom: 12px;">조연 캐릭터</h3>
+                <h3 style="color: #06b6d4; font-weight: 600; margin-bottom: 16px; font-size: 16px;">조연 캐릭터</h3>
                 ${songConfig.additionalCharacters.map((char, idx) => `
-                  <div style="margin-bottom: 8px;">${idx + 1}. ${char.name} - ${char.description}</div>
+                  <div style="padding: 8px 0; border-bottom: 1px solid #334155; color: #e2e8f0;">${idx + 1}. ${char.name} - ${char.description}</div>
                 `).join('')}
               </div>
             ` : ''}
           </div>
         `;
+        const storyImg = await captureSection(storyHtml);
+        await addImageToPdf(storyImg);
 
-        // ========== CHARACTER CASTING PAGE ==========
-        const characterPage = `
-          <div style="min-height: 1000px; padding: 40px 0; page-break-before: always;">
-            <div style="display: flex; align-items: center; margin-bottom: 30px;">
-              <div style="width: 6px; height: 40px; background: #a855f7; border-radius: 3px; margin-right: 15px;"></div>
-              <h2 style="font-size: 32px; font-weight: bold; color: white;">캐릭터 캐스팅</h2>
+        // ========== 3. CHARACTER CASTING PAGE ==========
+        const characterHtml = `
+          <div style="padding: 20px 0;">
+            <div style="display: flex; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #a855f7;">
+              <div style="width: 6px; height: 32px; background: #a855f7; border-radius: 3px; margin-right: 12px;"></div>
+              <h2 style="font-size: 28px; font-weight: bold; color: white;">캐릭터 캐스팅</h2>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
               ${characters.map(char => `
                 <div style="background: #1e293b; border-radius: 12px; padding: 16px; display: flex; gap: 16px;">
-                  ${char.imageUrl ? `<img src="${char.imageUrl}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px;" />` : '<div style="width: 100px; height: 100px; background: #334155; border-radius: 8px;"></div>'}
-                  <div style="flex: 1;">
-                    <h3 style="font-size: 18px; font-weight: bold; color: white; margin-bottom: 8px;">${char.name}</h3>
-                    <p style="font-size: 12px; color: #94a3b8; line-height: 1.4;">${char.description || ''}</p>
+                  ${char.imageUrl ? `<img src="${char.imageUrl}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px; flex-shrink: 0;" />` : '<div style="width: 100px; height: 100px; background: #334155; border-radius: 8px; flex-shrink: 0;"></div>'}
+                  <div style="flex: 1; min-width: 0;">
+                    <h3 style="font-size: 16px; font-weight: bold; color: white; margin-bottom: 8px;">${char.name}</h3>
+                    <p style="font-size: 11px; color: #94a3b8; line-height: 1.5;">${char.description || ''}</p>
                   </div>
                 </div>
               `).join('')}
             </div>
           </div>
         `;
+        const charImg = await captureSection(characterHtml);
+        await addImageToPdf(charImg);
 
-        // ========== CUE SHEET PAGES ==========
-        const cueSheetPage = `
-          <div style="padding: 40px 0; page-break-before: always;">
-            <div style="display: flex; align-items: center; margin-bottom: 30px;">
-              <div style="width: 6px; height: 40px; background: #22c55e; border-radius: 3px; margin-right: 15px;"></div>
-              <h2 style="font-size: 32px; font-weight: bold; color: white;">큐시트 (Cue Sheet)</h2>
-            </div>
+        // ========== 4. CUE SHEET - BY ACT ==========
+        const actGroups = [
+          { act: '1', label: '1막: 위기 발견', color: '#d97706', scenes: scenes.filter(s => s.act.includes('1')) },
+          { act: '2', label: '2막: 추격과 반전', color: '#dc2626', scenes: scenes.filter(s => s.act.includes('2')) },
+          { act: '3', label: '3막: 화해와 감동', color: '#16a34a', scenes: scenes.filter(s => s.act.includes('3')) },
+        ];
 
-            ${scenes.map(scene => {
-              const actColor = scene.act.includes('1') ? '#d97706' : scene.act.includes('2') ? '#dc2626' : '#16a34a';
-              return `
-                <div style="background: #1e293b; border-radius: 12px; padding: 16px; margin-bottom: 16px; display: flex; gap: 16px;">
-                  ${scene.generatedImageUrl ? `<img src="${scene.generatedImageUrl}" style="width: 150px; height: 100px; object-fit: cover; border-radius: 8px; flex-shrink: 0;" />` : ''}
+        for (const actGroup of actGroups) {
+          if (actGroup.scenes.length === 0) continue;
+
+          const actHtml = `
+            <div style="padding: 20px 0;">
+              <div style="display: flex; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid ${actGroup.color};">
+                <div style="width: 6px; height: 32px; background: ${actGroup.color}; border-radius: 3px; margin-right: 12px;"></div>
+                <h2 style="font-size: 28px; font-weight: bold; color: white;">${actGroup.label}</h2>
+                <span style="margin-left: auto; background: ${actGroup.color}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">${actGroup.scenes.length}개 씬</span>
+              </div>
+
+              ${actGroup.scenes.map(scene => `
+                <div style="background: #1e293b; border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; gap: 16px; border-left: 4px solid ${actGroup.color};">
+                  ${scene.generatedImageUrl ? `<img src="${scene.generatedImageUrl}" style="width: 140px; height: 90px; object-fit: cover; border-radius: 8px; flex-shrink: 0;" />` : '<div style="width: 140px; height: 90px; background: #334155; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 11px;">이미지 없음</div>'}
                   <div style="flex: 1; min-width: 0;">
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                      <span style="background: ${actColor}; color: white; font-size: 10px; font-weight: bold; padding: 2px 8px; border-radius: 4px;">${scene.act}</span>
-                      <span style="font-size: 16px; font-weight: bold; color: white;">Scene #${scene.id}</span>
-                      <span style="font-size: 12px; color: #06b6d4;">${scene.duration}s | ${scene.cameraAngle}</span>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                      <span style="font-size: 18px; font-weight: bold; color: white;">Scene #${scene.id}</span>
+                      <span style="font-size: 11px; color: #06b6d4; background: #0e7490; padding: 2px 8px; border-radius: 4px;">${scene.duration}s</span>
+                      <span style="font-size: 11px; color: #94a3b8;">${scene.cameraAngle}</span>
                     </div>
                     ${scene.charactersInvolved && scene.charactersInvolved.length > 0 ? `
-                      <div style="font-size: 11px; color: #94a3b8; margin-bottom: 8px;">등장: ${scene.charactersInvolved.join(', ')}</div>
+                      <div style="font-size: 10px; color: #64748b; margin-bottom: 6px;">👤 ${scene.charactersInvolved.join(', ')}</div>
                     ` : ''}
-                    <p style="font-size: 13px; color: #e2e8f0; line-height: 1.5; margin-bottom: 8px;">${scene.visualDescription}</p>
-                    <p style="font-size: 10px; color: #c084fc; line-height: 1.4; word-break: break-all;">Prompt: ${scene.videoPrompt}</p>
+                    <p style="font-size: 12px; color: #e2e8f0; line-height: 1.5; margin-bottom: 8px;">${scene.visualDescription}</p>
+                    <div style="background: #0f172a; border-radius: 6px; padding: 8px; border: 1px solid #334155;">
+                      <p style="font-size: 9px; color: #c084fc; line-height: 1.4; word-break: break-all; margin: 0;"><strong>Prompt:</strong> ${scene.videoPrompt}</p>
+                    </div>
                   </div>
                 </div>
-              `;
-            }).join('')}
-          </div>
-        `;
-
-        container.innerHTML = coverPage + storyPage + characterPage + cueSheetPage;
-        document.body.appendChild(container);
-
-        // Wait for images to load
-        const images = container.querySelectorAll('img');
-        await Promise.all(Array.from(images).map(img => {
-          if (img.complete) return Promise.resolve();
-          return new Promise((resolve) => {
-            img.onload = resolve;
-            img.onerror = resolve;
-          });
-        }));
-
-        // Generate PDF from HTML
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-
-        const canvas = await html2canvas(container, {
-          scale: 2,
-          backgroundColor: '#0f172a',
-          useCORS: true,
-          logging: false,
-          windowWidth: 800
-        });
-
-        const imgData = canvas.toDataURL('image/png');
-        const imgWidth = pageWidth;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-        // Split into pages
-        let heightLeft = imgHeight;
-        let position = 0;
-
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-
-        while (heightLeft > 0) {
-          position = heightLeft - imgHeight;
-          pdf.addPage();
-          pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-          heightLeft -= pageHeight;
+              `).join('')}
+            </div>
+          `;
+          const actImg = await captureSection(actHtml);
+          await addImageToPdf(actImg);
         }
-
-        // Remove temp container
-        document.body.removeChild(container);
 
         pdf.save(`${songConfig.title || 'storyboard'}_complete.pdf`);
     } catch (e: any) {
