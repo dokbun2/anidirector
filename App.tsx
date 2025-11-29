@@ -250,7 +250,7 @@ const App: React.FC = () => {
   };
 
   // Restore from JSON backup
-  const handleRestoreBackup = (backup: {
+  const handleRestoreBackup = async (backup: {
     storyConfig: StoryConfig;
     characters: Character[];
     storyboard: StoryboardData;
@@ -279,9 +279,30 @@ const App: React.FC = () => {
 
     // Set to storyboard step
     setCurrentStep(AppStep.STORYBOARD);
+    setViewMode('wizard');
 
     // Create new project ID for this restored project
-    setCurrentProjectId(Date.now().toString());
+    const newProjectId = Date.now().toString();
+    setCurrentProjectId(newProjectId);
+
+    // Save project to storage so it appears in Projects/Gallery
+    const projectToSave: SavedProject = {
+      id: newProjectId,
+      name: backup.storyConfig.title || '복원된 프로젝트',
+      updatedAt: new Date().toISOString(),
+      characters: restoredChars,
+      storyConfig: backup.storyConfig,
+      storyboardData: backup.storyboard,
+      step: AppStep.STORYBOARD
+    };
+
+    try {
+      await storageService.saveProject(projectToSave);
+      const updatedProjects = await storageService.getProjects();
+      setProjects(updatedProjects);
+    } catch (e: any) {
+      console.error('프로젝트 저장 실패:', e);
+    }
 
     alert('백업이 성공적으로 복원되었습니다!');
   };
