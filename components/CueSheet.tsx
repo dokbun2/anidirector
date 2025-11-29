@@ -353,9 +353,16 @@ const CueSheet: React.FC<Props> = ({ data, characters, songConfig, onReset, onSa
             return canvas.toDataURL('image/png');
         };
 
+        // Helper: Fill page background
+        const fillPageBackground = () => {
+            pdf.setFillColor(14, 23, 42); // #0e172a
+            pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+        };
+
         // Helper: Add image to PDF with page management
         const addImageToPdf = async (imgData: string, isFirstPage: boolean = false) => {
             if (!isFirstPage) pdf.addPage();
+            fillPageBackground();
 
             const img = new Image();
             img.src = imgData;
@@ -374,7 +381,10 @@ const CueSheet: React.FC<Props> = ({ data, characters, songConfig, onReset, onSa
                 let isFirst = true;
 
                 while (remainingHeight > 0) {
-                    if (!isFirst) pdf.addPage();
+                    if (!isFirst) {
+                        pdf.addPage();
+                        fillPageBackground();
+                    }
 
                     const availableHeight = pageHeight - (margin * 2);
                     const sliceHeight = Math.min(remainingHeight, availableHeight);
@@ -395,6 +405,9 @@ const CueSheet: React.FC<Props> = ({ data, characters, songConfig, onReset, onSa
                 }
             }
         };
+
+        // Fill first page background
+        fillPageBackground();
 
         // ========== 1. COVER PAGE ==========
         const coverHtml = `
