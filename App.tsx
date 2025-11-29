@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AppStep, Character, SavedProject, Scene, StoryConfig, StoryboardData, User, ViewMode } from './types';
 import CharacterLibrary from './components/CharacterLibrary'; // Kept for viewing library
 import ProjectSetup from './components/ProjectSetup';
@@ -11,6 +11,14 @@ import StoryboardLibrary from './components/StoryboardLibrary';
 import ApiKeySetup, { getStoredApiKey, clearStoredApiKey } from './components/ApiKeySetup';
 import { generateStoryboardPlan } from './services/geminiService';
 import { storageService } from './services/storage';
+
+interface BackupData {
+  version: string;
+  exportDate: string;
+  storyConfig: StoryConfig;
+  characters: Character[];
+  storyboard: StoryboardData;
+}
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -43,6 +51,7 @@ const App: React.FC = () => {
   const [storyboardData, setStoryboardData] = useState<StoryboardData | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const backupFileInputRef = useRef<HTMLInputElement>(null);
 
   const checkApiKey = () => {
     const hasKey = !!getStoredApiKey();
@@ -277,6 +286,36 @@ const App: React.FC = () => {
     alert('백업이 성공적으로 복원되었습니다!');
   };
 
+  // Handle backup file upload from header
+  const handleBackupFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const backupData = JSON.parse(event.target?.result as string) as BackupData;
+
+        // Validate backup structure
+        if (!backupData.storyConfig || !backupData.characters || !backupData.storyboard) {
+          throw new Error('유효하지 않은 백업 파일입니다.');
+        }
+
+        if (confirm(`"${backupData.storyConfig.title}" 프로젝트를 복원하시겠습니까?\n(현재 작업 내용이 덮어씌워집니다)`)) {
+          handleRestoreBackup(backupData);
+        }
+      } catch (err: any) {
+        alert('백업 파일을 읽는데 실패했습니다: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset input
+    if (backupFileInputRef.current) {
+      backupFileInputRef.current.value = '';
+    }
+  };
+
   if (isLoading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">로딩 중...</div>;
   if (!user) return <AuthScreen onLogin={handleLogin} />;
   if (!hasApiKey) return <ApiKeySetup onKeySelected={handleApiKeySelected} />;
@@ -424,8 +463,29 @@ const App: React.FC = () => {
             )}
             {/* Portal target for CueSheet header actions */}
             <div id="header-actions" className="flex items-center gap-2"></div>
-            <div className="text-xs text-slate-500">
-              {user?.email}
+
+            {/* Global Backup Upload Button */}
+            <div className="flex items-center gap-2">
+              <input
+                ref={backupFileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleBackupFileUpload}
+                className="hidden"
+              />
+              <button
+                onClick={() => backupFileInputRef.current?.click()}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1.5 rounded-md text-xs border border-slate-700 flex items-center gap-1.5 transition-colors"
+                title="백업 파일 복원"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                </svg>
+                복원
+              </button>
+              <div className="text-xs text-slate-500">
+                {user?.email}
+              </div>
             </div>
           </div>
         </header>
