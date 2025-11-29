@@ -1,5 +1,6 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Scene, StoryboardData, Character, StoryConfig } from '../types';
 import { generateSceneImage } from '../services/geminiService';
 import jsPDF from 'jspdf';
@@ -624,87 +625,71 @@ const CueSheet: React.FC<Props> = ({ data, characters, songConfig, onReset, onSa
     return '3막: 화해와 감동';
   };
 
+  // Header Actions Portal
+  const headerActionsContainer = typeof document !== 'undefined' ? document.getElementById('header-actions') : null;
+
+  const headerActions = (
+    <>
+      <span className="text-[10px] text-slate-500">모델:</span>
+      <select
+        value={selectedModel}
+        onChange={(e) => setSelectedModel(e.target.value as 'nano' | 'pro')}
+        className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:ring-1 focus:ring-cyan-500"
+      >
+        <option value="nano">Flash (빠름)</option>
+        <option value="pro">Pro (고품질)</option>
+      </select>
+
+      <div className="h-4 w-px bg-slate-700 mx-1"></div>
+
+      {/* Backup Upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        onChange={handleBackupUpload}
+        className="hidden"
+      />
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded-md border border-slate-700 transition-colors"
+        title="백업 복원"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+        </svg>
+      </button>
+
+      {/* Backup Download */}
+      <button
+        onClick={handleBackupDownload}
+        className="bg-slate-800 hover:bg-slate-700 text-white px-2.5 py-1.5 rounded-md text-xs border border-slate-700 flex items-center gap-1.5 transition-colors"
+        title="JSON 백업"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+        </svg>
+        저장
+      </button>
+
+      {/* PDF Download */}
+      <button
+        onClick={downloadPDF}
+        disabled={isDownloadingPdf}
+        className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-2.5 py-1.5 rounded-md font-bold text-xs shadow-lg flex items-center gap-1.5 transition-all"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+        </svg>
+        {isDownloadingPdf ? "생성중..." : "PDF"}
+      </button>
+    </>
+  );
+
   return (
     <div className="animate-fade-in h-full flex flex-col">
-      {/* Top Bar */}
-      <div className="bg-slate-900/95 backdrop-blur border-b border-slate-700 px-3 py-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-         <div className="flex items-center gap-3">
-             <button
-               onClick={onReset}
-               className="text-slate-500 hover:text-white p-1 rounded hover:bg-slate-800 transition-colors"
-               title="나가기"
-             >
-               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                 <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
-               </svg>
-             </button>
-             <div>
-                 <h2 className="font-bold text-base flex items-center gap-2 text-white">
-                     {songConfig.title}
-                     <span className="text-[10px] bg-pink-900/50 border border-pink-500/30 px-1.5 py-0.5 rounded text-pink-300">{scenes.length}프레임</span>
-                 </h2>
-                 <p className="text-[10px] text-slate-500">
-                    주인공: {songConfig.mainCharacterName} • 테마: 감동적인 동물 구조 이야기
-                 </p>
-             </div>
-         </div>
-
-         <div className="flex items-center gap-2">
-             <span className="text-[10px] text-slate-500">모델:</span>
-             <select
-               value={selectedModel}
-               onChange={(e) => setSelectedModel(e.target.value as 'nano' | 'pro')}
-               className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:ring-1 focus:ring-cyan-500"
-             >
-                 <option value="nano">Flash (빠름)</option>
-                 <option value="pro">Pro (고품질)</option>
-             </select>
-
-             <div className="h-4 w-px bg-slate-700 mx-1"></div>
-
-             {/* Backup Upload */}
-             <input
-               ref={fileInputRef}
-               type="file"
-               accept=".json"
-               onChange={handleBackupUpload}
-               className="hidden"
-             />
-             <button
-               onClick={() => fileInputRef.current?.click()}
-               className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded-md border border-slate-700 transition-colors"
-               title="백업 복원"
-             >
-               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
-               </svg>
-             </button>
-
-             {/* Backup Download */}
-             <button
-               onClick={handleBackupDownload}
-               className="bg-slate-800 hover:bg-slate-700 text-white px-2.5 py-1.5 rounded-md text-xs border border-slate-700 flex items-center gap-1.5 transition-colors"
-               title="JSON 백업"
-             >
-               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5">
-                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-               </svg>
-               저장
-             </button>
-
-             {/* PDF Download */}
-             <button
-               onClick={downloadPDF}
-               disabled={isDownloadingPdf}
-               className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-2.5 py-1.5 rounded-md font-bold text-xs shadow-lg flex items-center gap-1.5 transition-all"
-             >
-               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5">
-                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-               </svg>
-               {isDownloadingPdf ? "생성중..." : "PDF"}
-             </button>
-         </div>
-      </div>
+      {/* Portal: Header Actions */}
+      {headerActionsContainer && createPortal(headerActions, headerActionsContainer)}
 
       {/* Act Tabs */}
       <div className="bg-slate-900/80 border-b border-slate-800 px-3 py-2 flex items-center gap-2 overflow-x-auto">

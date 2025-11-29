@@ -422,6 +422,8 @@ const App: React.FC = () => {
             {viewMode === 'storyboards' && (
               <h2 className="text-lg font-bold text-white">스토리보드 갤러리</h2>
             )}
+            {/* Portal target for CueSheet header actions */}
+            <div id="header-actions" className="flex items-center gap-2"></div>
             <div className="text-xs text-slate-500">
               {user?.email}
             </div>
