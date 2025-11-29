@@ -487,11 +487,19 @@ const App: React.FC = () => {
               {/* Portal target for CueSheet header actions */}
               <div id="header-actions" className="flex items-center gap-2"></div>
 
-              {/* Refresh/Reload Button */}
+              {/* Clear All Data Button */}
               <button
-                onClick={() => window.location.reload()}
+                onClick={async () => {
+                  if (confirm('모든 데이터를 초기화하시겠습니까?\n(저장된 프로젝트, 캐릭터, 현재 작업 내용이 모두 삭제됩니다)')) {
+                    await storageService.clearAllData();
+                    handleReset(true);
+                    setCharacters([]);
+                    setProjects([]);
+                    alert('모든 데이터가 초기화되었습니다.');
+                  }
+                }}
                 className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded-md border border-slate-700 transition-colors cursor-pointer"
-                title="새로고침"
+                title="전체 초기화"
                 type="button"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 pointer-events-none">

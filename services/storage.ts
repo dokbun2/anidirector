@@ -148,5 +148,31 @@ export const storageService = {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
+  },
+
+  async clearAllData() {
+    const db = await getDB();
+
+    // Clear characters
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORES.CHARACTERS, 'readwrite');
+      const store = tx.objectStore(STORES.CHARACTERS);
+      store.clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+
+    // Clear projects
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORES.PROJECTS, 'readwrite');
+      const store = tx.objectStore(STORES.PROJECTS);
+      store.clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+
+    // Clear legacy localStorage items
+    localStorage.removeItem(KEYS.CHARACTERS_LS);
+    localStorage.removeItem(KEYS.PROJECTS_LS);
   }
 };
