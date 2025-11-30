@@ -636,8 +636,8 @@ const CueSheet: React.FC<Props> = ({ data, characters, songConfig, onReset, onSa
         onChange={(e) => setSelectedModel(e.target.value as 'nano' | 'pro')}
         className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:ring-1 focus:ring-cyan-500"
       >
-        <option value="nano">Flash (빠름)</option>
-        <option value="pro">Pro (고품질)</option>
+        <option value="nano">Flash - 무료</option>
+        <option value="pro">Pro - 유료</option>
       </select>
 
       <div className="h-4 w-px bg-slate-700 mx-1"></div>
