@@ -17,14 +17,7 @@ const CharacterAssignment: React.FC<Props> = ({ config, existingCharacters, onAs
 
   // Generate prompt for character
   const generatePrompt = (name: string, description: string, role: string) => {
-    return `Character Design Sheet for 3D Animation (Pixar Style).
-Name: ${name}
-Role: ${role}
-Visual Description: ${description}
-
-Style: Pixar-style 3D animation render, Unreal Engine 5, cute (if animal), expressive, highly detailed texture.
-Composition: Character sheet, white background, multiple angles (front, side, 3/4 view) or a single high-quality hero pose.
-Lighting: Soft studio lighting.`;
+    return `${description}, Pixar-style 3D animation, Unreal Engine 5, cute expressive character, highly detailed fur texture, character sheet, white background, soft studio lighting, multiple angles`;
   };
 
   // Copy prompt to clipboard
