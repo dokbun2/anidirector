@@ -93,7 +93,20 @@ const CharacterAssignment: React.FC<Props> = ({ config, existingCharacters, onAs
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImages(prev => ({ ...prev, [tempId]: reader.result as string }));
+        const imageUrl = reader.result as string;
+        setImages(prev => ({ ...prev, [tempId]: imageUrl }));
+
+        // Auto-save character immediately after upload
+        const target = characterTargets.find(t => t.tempId === tempId);
+        if (target) {
+          const newChar: Character = {
+            id: Date.now().toString() + Math.random().toString(),
+            name: target.name,
+            description: target.description,
+            imageUrl: imageUrl
+          };
+          onAssign(newChar);
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -104,6 +117,15 @@ const CharacterAssignment: React.FC<Props> = ({ config, existingCharacters, onAs
     try {
       const url = await generateCharacterDesign(name, description);
       setImages(prev => ({ ...prev, [tempId]: url }));
+
+      // Auto-save character immediately after generation
+      const newChar: Character = {
+        id: Date.now().toString() + Math.random().toString(),
+        name: name,
+        description: description,
+        imageUrl: url
+      };
+      onAssign(newChar);
     } catch (e: any) {
       alert("캐릭터 생성 실패: " + e.message);
     } finally {

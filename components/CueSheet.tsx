@@ -81,6 +81,15 @@ const CueSheet: React.FC<Props> = ({ data, characters, songConfig, onReset, onSa
         charDescriptions.push(`Name: ${c.name}, Appearance: ${c.description}`);
     });
 
+    // Debug: Check if character references are being used
+    console.log('Scene generation:', {
+      sceneId,
+      involvedCharNames,
+      involvedCharsCount: involvedChars.length,
+      charRefsCount: charRefs.length,
+      charDescriptions
+    });
+
     const modelName = selectedModel === 'nano' ? 'gemini-2.5-flash-image' : 'gemini-3-pro-image-preview';
 
     let promptToUse = scene.visualDescription;
