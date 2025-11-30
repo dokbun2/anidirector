@@ -33,6 +33,7 @@ const CueSheet: React.FC<Props> = ({ data, characters, songConfig, onReset, onSa
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; sceneId: number } | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Get unique acts from scenes
@@ -691,6 +692,52 @@ const CueSheet: React.FC<Props> = ({ data, characters, songConfig, onReset, onSa
       {/* Portal: Header Actions */}
       {headerActionsContainer && createPortal(headerActions, headerActionsContainer)}
 
+      {/* Lightbox Modal */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setLightboxImage(null)}
+        >
+          <div className="relative max-w-7xl max-h-full">
+            {/* Close Button */}
+            <button
+              onClick={() => setLightboxImage(null)}
+              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Image */}
+            <img
+              src={lightboxImage.url}
+              alt={`Scene ${lightboxImage.sceneId}`}
+              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+
+            {/* Scene Info */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 rounded-b-lg">
+              <p className="text-white font-bold">Scene #{lightboxImage.sceneId}</p>
+            </div>
+
+            {/* Download Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDownloadImage(e as any, lightboxImage.url, `${songConfig.title}_scene${lightboxImage.sceneId}.png`);
+              }}
+              className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-lg backdrop-blur transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Act Tabs */}
       <div className="bg-slate-900/80 border-b border-slate-800 px-3 py-2 flex items-center gap-2 overflow-x-auto">
         <button
@@ -800,7 +847,13 @@ const CueSheet: React.FC<Props> = ({ data, characters, songConfig, onReset, onSa
                      {scene.visualDescription}
                    </p>
                    {scene.generatedImageUrl && (
-                     <div className="mt-1.5 aspect-video rounded overflow-hidden">
+                     <div
+                       className="mt-1.5 aspect-video rounded overflow-hidden cursor-pointer hover:ring-2 hover:ring-cyan-500 transition-all"
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         setLightboxImage({ url: scene.generatedImageUrl!, sceneId: scene.id });
+                       }}
+                     >
                        <img src={scene.generatedImageUrl} className="w-full h-full object-cover" alt="" />
                      </div>
                    )}
@@ -848,28 +901,66 @@ const CueSheet: React.FC<Props> = ({ data, characters, songConfig, onReset, onSa
                        <div className="aspect-video bg-black rounded-md overflow-hidden relative border border-slate-700">
                          {scene.generatedImageUrl ? (
                            <>
-                             <img src={scene.generatedImageUrl} className="w-full h-full object-cover" alt="Concept" />
-                             <button
-                               onClick={(e) => handleDownloadImage(e, scene.generatedImageUrl!, `${songConfig.title}_scene${scene.id}.png`)}
-                               className="absolute top-1 right-1 bg-black/50 hover:bg-black/70 text-white p-0.5 rounded backdrop-blur opacity-0 group-hover:opacity-100 transition-opacity"
-                             >
-                               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3">
-                                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M12 9.75v10.5m0 0L7.5 15.75M12 20.25l4.5-4.5M3 16.5V2.25" />
-                               </svg>
-                             </button>
+                             <img
+                               src={scene.generatedImageUrl}
+                               className="w-full h-full object-cover cursor-pointer"
+                               alt="Concept"
+                               onClick={() => setLightboxImage({ url: scene.generatedImageUrl!, sceneId: scene.id })}
+                             />
+                             {/* Hover overlay with buttons */}
+                             <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                               <button
+                                 onClick={() => setLightboxImage({ url: scene.generatedImageUrl!, sceneId: scene.id })}
+                                 className="bg-cyan-600 hover:bg-cyan-500 text-white p-1.5 rounded-lg transition-colors"
+                                 title="크게 보기"
+                               >
+                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                                   <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607ZM10.5 7.5v6m3-3h-6" />
+                                 </svg>
+                               </button>
+                               <button
+                                 onClick={() => handleGenerateImage(scene.id, 'concept')}
+                                 disabled={scene.isGeneratingImage}
+                                 className="bg-pink-600 hover:bg-pink-500 text-white p-1.5 rounded-lg transition-colors disabled:opacity-50"
+                                 title="재생성"
+                               >
+                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                                 </svg>
+                               </button>
+                               <button
+                                 onClick={(e) => handleDownloadImage(e, scene.generatedImageUrl!, `${songConfig.title}_scene${scene.id}.png`)}
+                                 className="bg-slate-600 hover:bg-slate-500 text-white p-1.5 rounded-lg transition-colors"
+                                 title="다운로드"
+                               >
+                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                 </svg>
+                               </button>
+                             </div>
                            </>
                          ) : (
                            <div className="w-full h-full flex items-center justify-center text-slate-600 bg-slate-950">
                              <span className="text-[9px]">이미지</span>
                            </div>
                          )}
-                         <button
-                           onClick={() => handleGenerateImage(scene.id, 'concept')}
-                           disabled={scene.isGeneratingImage}
-                           className={`absolute inset-0 flex items-center justify-center transition-opacity text-white font-bold text-[10px] ${scene.generatedImageUrl ? 'bg-black/60 opacity-0 hover:opacity-100' : 'bg-transparent hover:bg-black/30'}`}
-                         >
-                           {scene.isGeneratingImage ? "생성중..." : (scene.generatedImageUrl ? "재생성" : "생성")}
-                         </button>
+                         {!scene.generatedImageUrl && (
+                           <button
+                             onClick={() => handleGenerateImage(scene.id, 'concept')}
+                             disabled={scene.isGeneratingImage}
+                             className="absolute inset-0 flex items-center justify-center transition-opacity text-white font-bold text-[10px] bg-transparent hover:bg-black/30"
+                           >
+                             {scene.isGeneratingImage ? "생성중..." : "생성"}
+                           </button>
+                         )}
+                         {scene.isGeneratingImage && (
+                           <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                             <svg className="animate-spin h-5 w-5 text-pink-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                             </svg>
+                           </div>
+                         )}
                        </div>
                      </div>
 

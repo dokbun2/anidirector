@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Character, StoryConfig } from '../types';
-import { generateCharacterDesign } from '../services/geminiService';
+import { generateCharacterDesign, translateToEnglish } from '../services/geminiService';
 
 interface Props {
   config: StoryConfig;
@@ -14,10 +14,26 @@ const CharacterAssignment: React.FC<Props> = ({ config, existingCharacters, onAs
   const [images, setImages] = useState<Record<string, string>>({});
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
+  const [englishDescriptions, setEnglishDescriptions] = useState<Record<string, string>>({});
+  const [translatingId, setTranslatingId] = useState<string | null>(null);
 
-  // Generate prompt for character
-  const generatePrompt = (name: string, description: string, role: string) => {
-    return `${description}, Pixar-style 3D animation, Unreal Engine 5, cute expressive character, highly detailed fur texture, character sheet, white background, soft studio lighting, multiple angles`;
+  // Generate 4-angle character sheet prompt with English description
+  const generatePrompt = (englishDescription: string) => {
+    return `${englishDescription}, character turnaround sheet, 4 angle views in 2x2 grid, front view, right side view, back view, left side view, T-pose, full body, head to toe, Pixar style, Disney 3D animation, cute expressive character, highly detailed fur texture, soft studio lighting, clean white background, professional character design reference sheet --ar 1:1 --v 7 --style raw`;
+  };
+
+  // Translate description to English
+  const handleTranslate = async (tempId: string, koreanDescription: string) => {
+    if (!koreanDescription) return;
+    setTranslatingId(tempId);
+    try {
+      const english = await translateToEnglish(koreanDescription);
+      setEnglishDescriptions(prev => ({ ...prev, [tempId]: english }));
+    } catch (err) {
+      console.error('Translation failed:', err);
+    } finally {
+      setTranslatingId(null);
+    }
   };
 
   // Copy prompt to clipboard
@@ -246,22 +262,42 @@ const CharacterAssignment: React.FC<Props> = ({ config, existingCharacters, onAs
                   {/* Prompt Section */}
                   <div className="mb-3">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-bold text-purple-400">이미지 생성 프롬프트</span>
-                      <button
-                        onClick={() => copyPrompt(char.tempId, generatePrompt(char.name, char.description, char.role))}
-                        className={`text-[10px] px-2 py-0.5 rounded transition-all ${
-                          copiedPromptId === char.tempId
-                            ? 'bg-green-600 text-white'
-                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                      >
-                        {copiedPromptId === char.tempId ? '복사됨!' : '복사'}
-                      </button>
+                      <span className="text-[10px] font-bold text-purple-400">프롬프트</span>
+                      <div className="flex items-center gap-1">
+                        {!englishDescriptions[char.tempId] && (
+                          <button
+                            onClick={() => handleTranslate(char.tempId, char.description)}
+                            disabled={translatingId === char.tempId}
+                            className="text-[10px] px-2 py-0.5 rounded transition-all bg-cyan-700 text-white hover:bg-cyan-600 disabled:opacity-50"
+                          >
+                            {translatingId === char.tempId ? '번역중...' : '영문 생성'}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => copyPrompt(char.tempId, generatePrompt(englishDescriptions[char.tempId] || '[Translate first]'))}
+                          disabled={!englishDescriptions[char.tempId]}
+                          className={`text-[10px] px-2 py-0.5 rounded transition-all ${
+                            copiedPromptId === char.tempId
+                              ? 'bg-green-600 text-white'
+                              : englishDescriptions[char.tempId]
+                                ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                          }`}
+                        >
+                          {copiedPromptId === char.tempId ? '복사됨!' : '복사'}
+                        </button>
+                      </div>
                     </div>
-                    <div className="bg-slate-950 border border-slate-700 rounded-lg p-2 max-h-24 overflow-y-auto">
-                      <p className="text-[10px] text-purple-300 font-mono whitespace-pre-wrap break-words leading-relaxed">
-                        {generatePrompt(char.name, char.description, char.role)}
-                      </p>
+                    <div className="bg-slate-950 border border-slate-700 rounded-lg p-2 max-h-32 overflow-y-auto">
+                      {englishDescriptions[char.tempId] ? (
+                        <p className="text-[10px] text-purple-300 font-mono whitespace-pre-wrap break-words leading-relaxed">
+                          {generatePrompt(englishDescriptions[char.tempId])}
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-slate-500 italic">
+                          '영문 생성' 버튼을 눌러 프롬프트를 생성하세요
+                        </p>
+                      )}
                     </div>
                   </div>
 

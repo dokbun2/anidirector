@@ -32,6 +32,33 @@ const StoryIdeaSchema = {
   required: ["title", "mainCharacterName", "mainCharacterDescription", "targetToSave", "targetToSaveDescription", "dangerThreat", "dangerTool", "dangerLocation", "backgroundSetting", "additionalCharacterName", "additionalCharacterDescription"]
 };
 
+// Translate Korean to English for prompts
+export const translateToEnglish = async (koreanText: string): Promise<string> => {
+  if (!koreanText) return '';
+
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `Translate this Korean text to English. Only return the English translation, nothing else:
+
+${koreanText}`,
+      config: {
+        systemInstruction: "You are a translator. Translate Korean to natural English. Only output the translation.",
+      },
+    });
+
+    const text = response.text;
+    if (!text) return koreanText;
+
+    return text.trim();
+  } catch (error) {
+    console.error("Translation error:", error);
+    return koreanText; // Return original if translation fails
+  }
+};
+
 export const generateStoryIdea = async (): Promise<Partial<StoryConfig>> => {
   const ai = new GoogleGenAI({ apiKey: getApiKey() });
   
@@ -183,21 +210,19 @@ export const generateStoryboardPlan = async (
 
 export const generateCharacterDesign = async (name: string, description: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: getApiKey() });
-  
-  const prompt = `
-    Character Design Sheet for 3D Animation (Pixar Style).
-    Name: ${name}
-    Visual Description: ${description}
-    
-    Style: Pixar-style 3D animation render, Unreal Engine 5, cute (if animal), expressive, highly detailed texture.
-    Composition: Character sheet, white background, multiple angles (front, side, 3/4 view) or a single high-quality hero pose.
-    Lighting: Soft studio lighting.
-  `;
+
+  const prompt = `${description}, character turnaround sheet, 4 angle views in 2x2 grid, front view, right side view, back view, left side view, T-pose, full body, head to toe, Pixar style, Disney 3D animation, cute expressive character, highly detailed fur texture, soft studio lighting, clean white background, professional character design reference sheet, Unreal Engine 5 render quality`;
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-image",
       contents: prompt,
+      config: {
+        responseModalities: ['image', 'text'],
+        imageGenerationConfig: {
+          aspectRatio: '1:1'  // Square ratio for 2x2 grid views
+        }
+      }
     });
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
@@ -286,19 +311,29 @@ export const generateSceneImage = async (
 
   const parts = buildParts(promptText);
 
+  // Normalize aspect ratio
+  const validAspectRatios = ['1:1', '3:2', '2:3', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'];
+  const normalizedAspectRatio = validAspectRatios.includes(aspectRatio) ? aspectRatio : '16:9';
+
   try {
-    const config: any = {
-       aspectRatio: aspectRatio === '4:3' ? '4:3' : (aspectRatio === '16:9' ? '16:9' : (aspectRatio === '9:16' ? '9:16' : '1:1'))
+    console.log('Image generation config:', { model: modelName, aspectRatio: normalizedAspectRatio });
+
+    const imageGenConfig: any = {
+      aspectRatio: normalizedAspectRatio
     };
-    
+
+    // Pro 모델에서 이미지 사이즈 옵션 추가
     if (modelName === 'gemini-3-pro-image-preview') {
-        config.imageSize = '1K'; 
+      imageGenConfig.imageSize = '1K';
     }
 
     const response = await ai.models.generateContent({
-      model: modelName, 
+      model: modelName,
       contents: { parts },
-      config: { imageConfig: config }
+      config: {
+        responseModalities: ['image', 'text'],
+        imageGenerationConfig: imageGenConfig
+      }
     });
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
