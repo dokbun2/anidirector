@@ -13,6 +13,30 @@ const CharacterAssignment: React.FC<Props> = ({ config, existingCharacters, onAs
   const [characterTargets, setCharacterTargets] = useState<{ tempId: string, name: string, description: string, role: string }[]>([]);
   const [images, setImages] = useState<Record<string, string>>({});
   const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
+
+  // Generate prompt for character
+  const generatePrompt = (name: string, description: string, role: string) => {
+    return `Character Design Sheet for 3D Animation (Pixar Style).
+Name: ${name}
+Role: ${role}
+Visual Description: ${description}
+
+Style: Pixar-style 3D animation render, Unreal Engine 5, cute (if animal), expressive, highly detailed texture.
+Composition: Character sheet, white background, multiple angles (front, side, 3/4 view) or a single high-quality hero pose.
+Lighting: Soft studio lighting.`;
+  };
+
+  // Copy prompt to clipboard
+  const copyPrompt = async (tempId: string, prompt: string) => {
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopiedPromptId(tempId);
+      setTimeout(() => setCopiedPromptId(null), 2000);
+    } catch (err) {
+      alert('복사 실패');
+    }
+  };
 
   useEffect(() => {
     const targets = [
@@ -225,6 +249,28 @@ const CharacterAssignment: React.FC<Props> = ({ config, existingCharacters, onAs
                 {/* Character Info & AI Generate */}
                 <div className="p-3 border-t border-slate-800">
                   <p className="text-xs text-slate-400 line-clamp-2 mb-3">{char.description || '외모 설명 없음'}</p>
+
+                  {/* Prompt Section */}
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-bold text-purple-400">이미지 생성 프롬프트</span>
+                      <button
+                        onClick={() => copyPrompt(char.tempId, generatePrompt(char.name, char.description, char.role))}
+                        className={`text-[10px] px-2 py-0.5 rounded transition-all ${
+                          copiedPromptId === char.tempId
+                            ? 'bg-green-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                      >
+                        {copiedPromptId === char.tempId ? '복사됨!' : '복사'}
+                      </button>
+                    </div>
+                    <div className="bg-slate-950 border border-slate-700 rounded-lg p-2 max-h-24 overflow-y-auto">
+                      <p className="text-[10px] text-purple-300 font-mono whitespace-pre-wrap break-words leading-relaxed">
+                        {generatePrompt(char.name, char.description, char.role)}
+                      </p>
+                    </div>
+                  </div>
 
                   {!hasImage && !isGenerating && (
                     <button
